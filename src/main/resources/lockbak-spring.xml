@@ -42,5 +42,5 @@
 
     <!-- Przyklady poziomów -->
     <logger name="org.springframework.web.reactive.function.client" level="WARN"/>
-    <logger name="com.emat.nature_service.gios" level="DEBUG"/>
+    <logger name="com.emat.nature_service.client" level="DEBUG"/>
 </configuration>

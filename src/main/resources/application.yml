@@ -20,3 +20,6 @@ server:
 app:
   version: @project.version@
   name: @project.name@
+
+gios:
+  base-url: "https://api.gios.gov.pl/pjp-api"
