@@ -13,6 +13,11 @@ import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
+import reactor.core.scheduler.Schedulers
+import java.time.Duration
+import java.util.*
+import kotlin.random.Random
+
 
 @Service
 class AirQualityServiceImpl(
@@ -21,6 +26,7 @@ class AirQualityServiceImpl(
     private val aqIndexRepository: AqIndexRepository
 ) : AirQualityService {
     private val log = LoggerFactory.getLogger(AirQualityServiceImpl::class.java)
+    private val AQ_CONCURRENCY = 3
 
     override fun synchronizeStations(): Mono<GiosStations> =
         giosClient.getAllStations()
@@ -43,17 +49,19 @@ class AirQualityServiceImpl(
 
     override fun saveMeasurementsForAllStations(): Flux<AqIndexDocument> =
         synchronizeStations()
-            .doOnNext { r -> log.info("Saving measurements for stations: {}", r.numberOfStations) }
             .map(GiosStations::stationList)
             .flatMapMany { Flux.fromIterable(it) }
-            .flatMap { station ->
-                getAqIndex(station.stationId)
-                    .filter { !it.stationId.isNullOrBlank() }
+            .flatMap({ station ->
+                // mały jitter aby rozproszyć żądania
+                val jitter = Random.nextLong(100, 350)
+                Mono.delay(Duration.ofMillis(jitter))
+                    .then(getAqIndex(station.stationId))
+                    .filter { !it.stationId.isNullOrBlank() }      // pomijaj puste stationId
                     .map { it.toDocument() }
-                    .doOnNext { aq -> log.info("Saving AQ index for stationId={}", aq.stationId) }
                     .flatMap { aqIndexRepository.save(it) }
                     .doOnNext { saved -> log.info("Saved AQ index for stationId={}", saved.stationId) }
-            }
+            }, AQ_CONCURRENCY)
+            .subscribeOn(Schedulers.boundedElastic())
 
     private fun updateExistingStations(stationList: List<GiosStation>): Mono<Void> =
         Flux.fromIterable(stationList)

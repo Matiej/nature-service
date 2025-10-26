@@ -19,4 +19,4 @@ logging:
 
 scheduler:
   airquality:
-    cron: "0 */1 * * * *"   # co 60 sekund
+    cron: "0 */5 * * * *"     
