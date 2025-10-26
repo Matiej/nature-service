@@ -8,9 +8,9 @@ data class AqIndexDocument(
     @Id
     val id: String? = null,
     val savingDate: String,
-    val stationId: String,
+    val stationId: String?,
     val calculationDate: String?,
-    val indexValue: Int,
+    val indexValue: Int?,
     val indexCategory: String?,
     val sourceDataDate: String?,
     val so2CalculationDate: String?,

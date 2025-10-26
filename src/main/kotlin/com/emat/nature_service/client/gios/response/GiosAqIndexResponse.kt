@@ -13,9 +13,9 @@ data class GiosAqIndexResponse(
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     data class AqIndexResponse(
-        @JsonProperty("Identyfikator stacji pomiarowej") val stationId: String,
+        @JsonProperty("Identyfikator stacji pomiarowej") val stationId: String?,
         @JsonProperty("Data wykonania obliczeń indeksu") val calculationDate: String?,
-        @JsonProperty("Wartość indeksu") val indexValue: Int,
+        @JsonProperty("Wartość indeksu") val indexValue: Int?,
         @JsonProperty("Nazwa kategorii indeksu") val indexCategory: String?,
         @JsonProperty("Data danych źródłowych, z których policzono wartość indeksu dla wskaźnika st") val sourceDataDate: String?,
         @JsonProperty("Data wykonania obliczeń indeksu dla wskaźnika SO2") val so2CalculationDate: String?,

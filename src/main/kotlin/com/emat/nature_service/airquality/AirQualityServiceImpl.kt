@@ -38,6 +38,7 @@ class AirQualityServiceImpl(
                 val domain = response.toDomain()
                 if (domain != null) Mono.just(domain) else Mono.empty()
             }
+            .filter { !it.stationId.isNullOrBlank() }
             .doOnNext { log.info("Received aqIndex for station {}", stationId) }
 
     override fun saveMeasurementsForAllStations(): Flux<AqIndexDocument> =
@@ -47,6 +48,7 @@ class AirQualityServiceImpl(
             .flatMapMany { Flux.fromIterable(it) }
             .flatMap { station ->
                 getAqIndex(station.stationId)
+                    .filter { !it.stationId.isNullOrBlank() }
                     .map { it.toDocument() }
                     .doOnNext { aq -> log.info("Saving AQ index for stationId={}", aq.stationId) }
                     .flatMap { aqIndexRepository.save(it) }

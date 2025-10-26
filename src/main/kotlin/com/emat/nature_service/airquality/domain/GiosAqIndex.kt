@@ -5,9 +5,9 @@ import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
 data class GiosAqIndex(
-    val stationId: String,
+    val stationId: String?,
     val calculationDate: String?,
-    val indexValue: Int,
+    val indexValue: Int?,
     val indexCategory: String?,
     val sourceDataDate: String?,
     val so2CalculationDate: String?,
