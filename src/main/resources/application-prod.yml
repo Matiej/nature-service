@@ -1,0 +1,32 @@
+spring:
+  management:
+    endpoints:
+      web:
+        exposure:
+          include: health,info,logfile
+    endpoint:
+      logfile:
+        enabled: true
+      health:
+        probes:
+          enabled: true
+        show-details: never
+  logging:
+    file:
+      name: /app/logs/nature-service.log
+    level:
+      root: INFO
+      org.springframework.web.reactive.function.client: WARN
+  config:
+    import: optional:file:/config/nature-service-application.yml
+  #    in docker, mounted from server file path in opt/
+
+  data:
+    mongodb:
+      uri: mongodb://nature-service_app:${MONGO_PWD}@mongo:27017/nature-service?authSource=nature-service
+
+logging:
+  level:
+    root: INFO
+    com.emat.reapi.ai.configuration: DEBUG
+    org.springframework.web.reactive.function.client: TRACE

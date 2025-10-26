@@ -1,0 +1,15 @@
+spring:
+  config:
+    import: file:///G:/javaProjects/CONFIG/nature-service/nature-service-application.yml
+
+  data:
+    mongodb:
+      host: localhost
+      port: 27019
+      database: nature-service_mongo_db
+
+logging:
+  level:
+    root: INFO
+    com.emat.reapi.ai.configuration: DEBUG
+    org.springframework.web.reactive.function.client: TRACE
