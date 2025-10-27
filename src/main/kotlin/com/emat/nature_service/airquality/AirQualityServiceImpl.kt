@@ -3,20 +3,19 @@ package com.emat.nature_service.airquality
 import com.emat.nature_service.airquality.domain.GiosAqIndex
 import com.emat.nature_service.airquality.domain.GiosStation
 import com.emat.nature_service.airquality.domain.GiosStations
-import com.emat.nature_service.airquality.infra.AqIndexDocument
+import com.emat.nature_service.airquality.domain.toDomain
 import com.emat.nature_service.airquality.infra.AqIndexRepository
-import com.emat.nature_service.airquality.infra.StationDocument
 import com.emat.nature_service.airquality.infra.StationRepository
+import com.emat.nature_service.api.TakingMeasurementsResponse
 import com.emat.nature_service.client.gios.GiosClient
 import com.emat.nature_service.client.gios.response.GiosStationsResponse
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
+import org.springframework.web.reactive.function.client.WebClientResponseException
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
 import reactor.core.scheduler.Schedulers
 import java.time.Duration
-import java.util.*
-import kotlin.random.Random
 
 
 @Service
@@ -28,14 +27,17 @@ class AirQualityServiceImpl(
     private val log = LoggerFactory.getLogger(AirQualityServiceImpl::class.java)
     private val AQ_CONCURRENCY = 3
 
-    override fun synchronizeStations(): Mono<GiosStations> =
+    override fun synchronizeStations(): Mono<Triple<GiosStations, GiosStations, GiosStations>> =
         giosClient.getAllStations()
             .doOnNext { r -> log.info("Received {} stations from GIOS", r.getNumberOfStations()) }
             .map(GiosStationsResponse::toDomain)
             .flatMap { stations ->
-                updateExistingStations(stations.stationList)
-                    .then(saveNewStations(stations.stationList))
-                    .thenReturn(stations)
+                val updateExistingStations = updateExistingStations(stations.stationList)
+                val saveNewStations = saveNewStations(stations.stationList)
+
+                Mono.zip(updateExistingStations, saveNewStations) { updated, saved ->
+                    Triple(stations, updated, saved)
+                }
             }
 
     override fun getAqIndex(stationId: String): Mono<GiosAqIndex> =
@@ -47,43 +49,63 @@ class AirQualityServiceImpl(
             .filter { !it.stationId.isNullOrBlank() }
             .doOnNext { log.info("Received aqIndex for station {}", stationId) }
 
-    override fun saveMeasurementsForAllStations(): Flux<AqIndexDocument> =
+    override fun saveMeasurementsForAllStationsSlow(): Mono<TakingMeasurementsResponse> =
         synchronizeStations()
-            .map(GiosStations::stationList)
-            .flatMapMany { Flux.fromIterable(it) }
-            .flatMap({ station ->
-                // mały jitter aby rozproszyć żądania
-                val jitter = Random.nextLong(100, 350)
-                Mono.delay(Duration.ofMillis(jitter))
-                    .then(getAqIndex(station.stationId))
-                    .filter { !it.stationId.isNullOrBlank() }      // pomijaj puste stationId
-                    .map { it.toDocument() }
-                    .flatMap { aqIndexRepository.save(it) }
-                    .doOnNext { saved -> log.info("Saved AQ index for stationId={}", saved.stationId) }
-            }, AQ_CONCURRENCY)
-            .subscribeOn(Schedulers.boundedElastic())
+            .flatMap { par ->
+                Flux.fromIterable(par.first.stationList)
+                    .delayElements(Duration.ofMillis(500))
+                    .concatMap { station ->
+                        getAqIndexRespecting429(station.stationId!!)
+                            .filter { !it.stationId.isNullOrBlank() }   // odrzuć „puste” odpowiedzi
+                            .map { it.toDocument() }
+                            .flatMap(aqIndexRepository::save)
+                            .doOnNext { saved ->
+                                log.info("Saved AQ index (SLOW) for stationId={}", saved.stationId)
+                            }
+                    }
+                    .collectList()
+                    .map { savedList ->
+                        TakingMeasurementsResponse(
+                            fetchedStations = par.first,
+                            updatedStations = par.second,
+                            savedStations = par.third,
+                            savedMeasurements = savedList.size
+                        )
+                    }
+            }.subscribeOn(Schedulers.boundedElastic())
 
-    private fun updateExistingStations(stationList: List<GiosStation>): Mono<Void> =
+
+    /** Helper: woła GIOŚ i szanuje 429 + Retry-After (jedna powtórka). */
+    private fun getAqIndexRespecting429(stationId: String): Mono<GiosAqIndex> =
+        giosClient.getAqIndex(stationId)
+            .onErrorResume(WebClientResponseException.TooManyRequests::class.java) { ex ->
+                log.warn("GIOŚ 429 status for station {}. Retrying once after 5s", stationId)
+                Mono.delay(Duration.ofSeconds(5))
+                    .then(giosClient.getAqIndex(stationId))
+            }
+            .flatMap { resp -> resp.toDomain()?.let { Mono.just(it) } ?: Mono.empty() }
+            .filter { !it.stationId.isNullOrBlank() }
+
+    private fun updateExistingStations(stationList: List<GiosStation>): Mono<GiosStations> =
         Flux.fromIterable(stationList)
             .flatMap { station ->
-                val newDoc = station.toDocument()
-                stationRepository.findByStationId(newDoc.stationId)
+                val newStationDocument = station.toDocument()
+                stationRepository.findByStationId(newStationDocument.stationId)
                     .flatMap { existing ->
-                        // porównujemy wszystkie pola poza _id (data class porówna też null-e)
-                        if (existing.copy(id = null) == newDoc.copy(id = null)) {
-                            Mono.empty() // identyczne → pomijamy
+                        if (existing == newStationDocument) {
+                            Mono.empty()
                         } else {
-                            // różne → aktualizujemy (zachowujemy _id)
-                            stationRepository.save(newDoc.copy(id = existing.id))
+                            stationRepository.save(newStationDocument.copy(id = existing.id))
                                 .doOnNext { saved -> log.info("Updated station id: {}", saved.stationId) }
-                                .then()
+
                         }
                     }
-                    .switchIfEmpty(Mono.empty()) // brak w bazie → doda saveNewStations()
-            }
-            .then()
+                    .map { it.toDomain() }
+                    .switchIfEmpty(Mono.empty())
+            }.collectList()
+            .map { updatedList -> GiosStations(updatedList, updatedList.size) }
 
-    private fun saveNewStations(stationList: List<GiosStation>): Mono<Void> =
+    private fun saveNewStations(stationList: List<GiosStation>): Mono<GiosStations> =
         Flux.fromIterable(stationList)
             .flatMap { station ->
                 val newDoc = station.toDocument()
@@ -95,14 +117,12 @@ class AirQualityServiceImpl(
                         } else {
                             stationRepository.save(newDoc)
                                 .doOnNext { saved -> log.info("Inserted station id: {}", saved.stationId) }
-                                .onErrorResume(org.springframework.dao.DuplicateKeyException::class.java) {
-                                    // w razie rzadkiego wyścigu przy równoległych zapisach
-                                    log.debug("Duplicate on stationId={}, ignoring insert.", newDoc.stationId)
-                                    Mono.empty()
-                                }
-                                .then()
                         }
                     }
-            }
-            .then()
+
+            }.map { it.toDomain() }
+            .collectList()
+            .map { updatedList -> GiosStations(updatedList, updatedList.size) }
+
+
 }

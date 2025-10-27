@@ -36,3 +36,18 @@ data class GiosStation(
             street = street
         )
 }
+
+fun StationDocument.toDomain(): GiosStation =
+    GiosStation(
+        stationId = stationId,
+        code = code,
+        name = name,
+        latitude = latitude,
+        longitude = longitude,
+        cityId = cityId,
+        city = city,
+        commune = commune,
+        district = district,
+        voivodeship = voivodeship,
+        street = street
+    )
