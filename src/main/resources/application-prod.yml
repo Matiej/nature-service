@@ -21,10 +21,6 @@ spring:
     import: optional:file:/config/nature-service-application.yml
   #    in docker, mounted from server file path in opt/
 
-  data:
-    mongodb:
-      uri: mongodb://nature-service_app:${MONGO_PWD}@mongo:27017/nature-service?authSource=nature-service
-
 logging:
   level:
     root: INFO
