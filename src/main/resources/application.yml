@@ -23,3 +23,6 @@ app:
 
 gios:
   base-url: "https://api.gios.gov.pl/pjp-api"
+
+n8n:
+  base-url: "localhost:8081/"
