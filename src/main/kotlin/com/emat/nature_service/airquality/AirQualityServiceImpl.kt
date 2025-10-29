@@ -25,7 +25,6 @@ class AirQualityServiceImpl(
     private val aqIndexRepository: AqIndexRepository
 ) : AirQualityService {
     private val log = LoggerFactory.getLogger(AirQualityServiceImpl::class.java)
-    private val AQ_CONCURRENCY = 3
 
     override fun synchronizeStations(): Mono<Triple<GiosStations, GiosStations, GiosStations>> =
         giosClient.getAllStations()

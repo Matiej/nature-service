@@ -1,0 +1,25 @@
+package com.emat.nature_service.client.n8n
+
+import com.emat.nature_service.api.TakingMeasurementsResponse
+import org.springframework.stereotype.Service
+import reactor.core.publisher.Mono
+
+@Service
+class N8nService(
+    private val n8nClient: N8nClient
+) {
+    fun sendMeasurementEmailNotification(
+        measurementsResponse: TakingMeasurementsResponse?,
+        errorMessage: String?
+    ): Mono<Void> =
+        n8nClient.sendEmailNotification(
+            EmailNotificationRequest(
+                stationsFetched = measurementsResponse?.fetchedStations?.numberOfStations ?: 0,
+                stationsUpdated = measurementsResponse?.updatedStations?.numberOfStations ?: 0,
+                stationsSaved = measurementsResponse?.savedStations?.numberOfStations ?: 0,
+                measurements = measurementsResponse?.savedMeasurements ?: 0,
+                errorMessage = errorMessage ?: "No errors"
+            )
+        )
+
+}
