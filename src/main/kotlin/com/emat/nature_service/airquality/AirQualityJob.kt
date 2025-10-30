@@ -12,13 +12,15 @@ class AirQualityJob(
     private val airQualityService: AirQualityService,
     private val nnN8nService: N8nService,
     @Value("\${scheduler.airquality.cron}")
-    private val cronExpression: String
+    private val cronExpression: String,
+    @Value("\${scheduler.airquality.duration}")
+    private val duration: Int
 ) {
     private val log = LoggerFactory.getLogger(AirQualityJob::class.java)
 
     @Scheduled(cron = "\${scheduler.airquality.cron}")
     fun runAirQualitySyncJob() {
-        airQualityService.saveMeasurementsForAllStationsSlow()
+        airQualityService.saveMeasurementsForAllStationsSlow(duration)
             .doOnSubscribe { log.info("Running AirQualityJob with cron: {}", cronExpression) }
             .flatMap { measurementResult ->
                 nnN8nService.sendMeasurementEmailNotification(measurementResult, null)
@@ -29,7 +31,7 @@ class AirQualityJob(
                     .thenReturn(measurementResult)
             }
             .doOnSuccess { suc ->
-                log.info("✅ Air quality synchronization finished successfully. Fetched: ${suc.savedMeasurements} measurements" )
+                log.info("✅ Air quality synchronization finished successfully. Fetched: ${suc.savedMeasurements} measurements")
             }
             .onErrorResume { error ->
                 nnN8nService.sendMeasurementEmailNotification(null, error.message)
@@ -39,7 +41,7 @@ class AirQualityJob(
                     }.then(
                         Mono.fromRunnable { log.error("❌ Air quality synchronization failed", error) }
                     )
-                 }
+            }
             .subscribe()
     }
 }

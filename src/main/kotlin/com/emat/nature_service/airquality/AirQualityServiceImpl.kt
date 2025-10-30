@@ -48,14 +48,14 @@ class AirQualityServiceImpl(
             .filter { !it.stationId.isNullOrBlank() }
             .doOnNext { log.info("Received aqIndex for station {}", stationId) }
 
-    override fun saveMeasurementsForAllStationsSlow(): Mono<TakingMeasurementsResponse> =
+    override fun saveMeasurementsForAllStationsSlow(duration: Int): Mono<TakingMeasurementsResponse> =
         synchronizeStations()
             .flatMap { par ->
                 Flux.fromIterable(par.first.stationList)
-                    .delayElements(Duration.ofMillis(500))
+                    .delayElements(Duration.ofMillis(duration.toLong()))
                     .concatMap { station ->
                         getAqIndexRespecting429(station.stationId!!)
-                            .filter { !it.stationId.isNullOrBlank() }   // odrzuć „puste” odpowiedzi
+                            .filter { !it.stationId.isNullOrBlank() }
                             .map { it.toDocument() }
                             .flatMap(aqIndexRepository::save)
                             .doOnNext { saved ->
