@@ -11,6 +11,7 @@ class N8nClient(
 ) {
     companion object {
         private const val EMAIL_AIR_QUALITY_JOB_URI = "/gios/email"
+        private const val EMAIL_WEATHER_JOB_URI = "/imgw/email"
         private val log = LoggerFactory.getLogger(N8nClient::class.java)
     }
 
@@ -22,6 +23,17 @@ class N8nClient(
             .retrieve()
             .bodyToMono(Void::class.java)
             .doOnSubscribe { log.info("Calling n8n email notifier: {}", EMAIL_AIR_QUALITY_JOB_URI) }
+            .doOnSuccess { log.info("n8n email notifier responded with 2xx (no body).") }
+            .doOnError { e -> log.error("Error calling n8n email notifier", e) }
+
+    fun sendWeatherEmailNotification(request: WeatherEmailNotificationRequest): Mono<Void> =
+        n8nWebClient
+            .post()
+            .uri(EMAIL_WEATHER_JOB_URI)
+            .bodyValue(request)
+            .retrieve()
+            .bodyToMono(Void::class.java)
+            .doOnSubscribe { log.info("Calling n8n email notifier: {}", EMAIL_WEATHER_JOB_URI) }
             .doOnSuccess { log.info("n8n email notifier responded with 2xx (no body).") }
             .doOnError { e -> log.error("Error calling n8n email notifier", e) }
 }

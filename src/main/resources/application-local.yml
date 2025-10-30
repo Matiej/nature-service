@@ -21,6 +21,8 @@ scheduler:
   airquality:
     cron: "0 */2 * * * *"
     duration: 500
+  weather:
+    cron: "0 30 0/3 * * *"
 
 n8n:
   base-url: "http://192.168.50.34:5678/webhook-test"

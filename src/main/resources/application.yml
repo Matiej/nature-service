@@ -26,3 +26,6 @@ gios:
 
 n8n:
   base-url: "localhost:8081/"
+
+imgw:
+  base-url: "https://danepubliczne.imgw.pl"
