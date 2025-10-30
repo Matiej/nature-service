@@ -9,5 +9,5 @@ interface AirQualityService {
     fun synchronizeStations(): Mono<Triple<GiosStations, GiosStations, GiosStations>>
     fun getAqIndex(stationId: String): Mono<GiosAqIndex>
 
-    fun saveMeasurementsForAllStationsSlow(): Mono<TakingMeasurementsResponse>
+    fun saveMeasurementsForAllStationsSlow(duration: Int): Mono<TakingMeasurementsResponse>
 }
